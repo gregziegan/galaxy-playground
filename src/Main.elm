@@ -79,7 +79,7 @@ numArms =
 
 
 starsPerArm =
-    100
+    75
 
 
 armAngle =
