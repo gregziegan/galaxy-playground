@@ -35,7 +35,7 @@ var commonConfig = {
   plugins: [
       new CopyWebpackPlugin([
         {
-            from: '../aframe/'
+            from: 'aframe/'
         },
         {
             from: '../models/'
@@ -77,12 +77,11 @@ if ( TARGET_ENV === 'development' ) {
           loader:  'elm-hot!elm-webpack?debug=true&verbose=true&warn=true'
         },
         {
-          test: /\.(css|scss)$/,
+          test: /\.(css)$/,
           loaders: [
             'style-loader',
             'css-loader',
             'postcss-loader',
-            'sass-loader'
           ]
         }
       ]
@@ -107,11 +106,10 @@ if ( TARGET_ENV === 'production' ) {
           loader:  'elm-webpack'
         },
         {
-          test: /\.(css|scss)$/,
+          test: /\.(css)$/,
           loader: ExtractTextPlugin.extract( 'style-loader', [
             'css-loader',
             'postcss-loader',
-            'sass-loader'
           ])
         }
       ]
