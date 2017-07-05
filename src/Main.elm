@@ -4,15 +4,16 @@ import AFrame exposing (..)
 import AFrame.Primitives exposing (box, sky, sphere)
 import AFrame.Primitives.Attributes as A
 import AFrame.Primitives.Light as Light
-import Color
+import Array
+import Color exposing (Color)
 import Html exposing (..)
 import Html.Attributes as Attr
-import Random exposing (float, list, pair)
+import Random exposing (float, int, list, map3)
 import Time
 
 
 type alias Model =
-    { randPairs : List (List ( Float, Float ))
+    { randPairs : List (List ( Color, Float, Float ))
     , angle : Float
     }
 
@@ -27,13 +28,23 @@ init =
 
 
 type Msg
-    = NewRandomPairs (List (List ( Float, Float )))
+    = NewRandomPairs (List (List ( Color, Float, Float )))
     | NewAngle
 
 
-randomPoint : Random.Generator ( Float, Float )
+starColors =
+    Array.fromList [ Color.red, Color.lightYellow, Color.lightBlue ]
+
+
+colorGen =
+    int 0 2
+        |> Random.map (\index -> Array.get index starColors)
+        |> Random.map (Maybe.withDefault Color.lightYellow)
+
+
+randomPoint : Random.Generator ( Color, Float, Float )
 randomPoint =
-    pair (float -5 5) (float -5 5)
+    map3 (,,) colorGen (float -5 5) (float -5 5)
 
 
 generateRandomArm =
@@ -94,7 +105,7 @@ angleTuningParam =
     1
 
 
-getStarHelper ( randX, randY ) radius angle =
+getStarHelper ( color, randX, randY ) radius angle =
     let
         x =
             (radius * cos angle) + randX
@@ -102,7 +113,7 @@ getStarHelper ( randX, randY ) radius angle =
         y =
             (radius * sin angle) + randY
     in
-    ( x, y )
+    ( color, x, y )
 
 
 getStar curArm index randPair =
@@ -119,7 +130,7 @@ getStar curArm index randPair =
     getStarHelper randPair radius newAngle
 
 
-getArm : Int -> List ( Float, Float ) -> List ( Float, Float )
+getArm : Int -> List ( Color, Float, Float ) -> List ( Color, Float, Float )
 getArm curArm randPairs =
     List.indexedMap (getStar curArm) randPairs
 
@@ -134,7 +145,7 @@ viewSky =
     sky [ A.color Color.black ] []
 
 
-viewStar ( dx, dy ) =
+viewStar ( color, dx, dy ) =
     sphere
         [ --Light.type_ Light.Point
           --, A.intensity 2
@@ -143,6 +154,6 @@ viewStar ( dx, dy ) =
           A.radius 0.5
         , A.position dx dy -200
         , Attr.attribute "material" "color: #FFF; shader: flat"
-        , A.color Color.yellow
+        , A.color color
         ]
         []
