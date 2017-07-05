@@ -43,7 +43,7 @@ var commonConfig = {
       ]),
 
     new HtmlWebpackPlugin({
-      template: 'docs/index.html',
+      template: 'src/index.html',
       inject:   'body',
       filename: 'index.html'
     })
@@ -61,7 +61,7 @@ if ( TARGET_ENV === 'development' ) {
 
     entry: [
       'webpack-dev-server/client?http://localhost:8080',
-      path.join( __dirname, 'docs/index.js' )
+      path.join( __dirname, 'src/index.js' )
     ],
 
     devServer: {
