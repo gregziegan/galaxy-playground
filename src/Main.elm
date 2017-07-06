@@ -8,12 +8,13 @@ import Array
 import Color exposing (Color)
 import Html exposing (..)
 import Html.Attributes as Attr
-import Random exposing (float, int, list, map3)
+import Random exposing (float, int, list, map4)
+import Random.Extra exposing (frequency)
 import Time
 
 
 type alias Model =
-    { randPairs : List (List ( Color, Float, Float ))
+    { randPairs : List (List ( Color, Float, Float, Float ))
     , angle : Float
     }
 
@@ -23,36 +24,45 @@ init =
     ( { randPairs = []
       , angle = 20
       }
-    , Random.generate NewRandomPairs generateRandomPairs
+    , Random.generate NewRandomPairs generateGalaxy
     )
 
 
 type Msg
-    = NewRandomPairs (List (List ( Color, Float, Float )))
+    = NewRandomPairs (List (List ( Color, Float, Float, Float )))
     | NewAngle
 
 
-starColors =
-    Array.fromList [ Color.red, Color.lightYellow, Color.lightBlue ]
+starColors distance =
+    Random.map (Maybe.withDefault Color.lightYellow) <|
+        Random.Extra.sample <|
+            if distance == 1 then
+                [ Color.lightYellow, Color.lightBlue ]
+            else if distance == 2 then
+                [ Color.red, Color.lightYellow, Color.lightBlue ]
+            else
+                [ Color.red, Color.lightYellow ]
 
 
-colorGen =
-    int 0 2
-        |> Random.map (\index -> Array.get index starColors)
-        |> Random.map (Maybe.withDefault Color.lightYellow)
+randomPoint : Int -> Random.Generator ( Color, Float, Float, Float )
+randomPoint distance =
+    map4 (,,,) (starColors distance) (float -5 5) (float -5 5) (float -50 50)
 
 
-randomPoint : Random.Generator ( Color, Float, Float )
-randomPoint =
-    map3 (,,) colorGen (float -5 5) (float -5 5)
+generateRandomArm distance =
+    list (starsPerArm // 3) (randomPoint distance)
 
 
-generateRandomArm =
-    list starsPerArm randomPoint
+generateRandomPairs distance =
+    list numArms (generateRandomArm distance)
 
 
-generateRandomPairs =
-    list numArms generateRandomArm
+(+++) a b c =
+    a ++ b ++ c
+
+
+generateGalaxy =
+    Random.map3 (+++) (generateRandomPairs 1) (generateRandomPairs 2) (generateRandomPairs 3)
 
 
 update msg model =
@@ -73,7 +83,11 @@ view model =
 
 
 subscriptions model =
-    Time.every (100 * Time.millisecond) (\_ -> NewAngle)
+    Sub.none
+
+
+
+--Time.every (100 * Time.millisecond) (\_ -> NewAngle)
 
 
 main =
@@ -105,7 +119,7 @@ angleTuningParam =
     1
 
 
-getStarHelper ( color, randX, randY ) radius angle =
+getStarHelper ( color, randX, randY, z ) radius angle =
     let
         x =
             (radius * cos angle) + randX
@@ -113,7 +127,7 @@ getStarHelper ( color, randX, randY ) radius angle =
         y =
             (radius * sin angle) + randY
     in
-    ( color, x, y )
+    ( color, x, y, z )
 
 
 getStar curArm index randPair =
@@ -130,7 +144,7 @@ getStar curArm index randPair =
     getStarHelper randPair radius newAngle
 
 
-getArm : Int -> List ( Color, Float, Float ) -> List ( Color, Float, Float )
+getArm : Int -> List ( Color, Float, Float, Float ) -> List ( Color, Float, Float, Float )
 getArm curArm randPairs =
     List.indexedMap (getStar curArm) randPairs
 
@@ -145,14 +159,14 @@ viewSky =
     sky [ A.color Color.black ] []
 
 
-viewStar ( color, dx, dy ) =
+viewStar ( color, dx, dy, dz ) =
     sphere
         [ --Light.type_ Light.Point
           --, A.intensity 2
           --, A.distance 120
           -- , A.color Color.white
           A.radius 0.5
-        , A.position dx dy -200
+        , A.position dx dy (dz - 150)
         , Attr.attribute "material" "color: #FFF; shader: flat"
         , A.color color
         ]
