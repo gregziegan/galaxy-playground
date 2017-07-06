@@ -14,7 +14,7 @@ import Time
 
 
 type alias Model =
-    { galaxy : Galaxy
+    { galaxies : List Galaxy
     , angle : Float
     }
 
@@ -38,66 +38,121 @@ type alias Star =
     }
 
 
+type Region
+    = Center
+    | Middle
+    | Outskirts
+
+
+type alias StarInfo =
+    { index : Int
+    , curArm : Int
+    , armAngle : Float
+    , position : Position
+    , region : Region
+    }
+
+
 init : ( Model, Cmd Msg )
 init =
-    ( { galaxy = { arms = [] }
+    ( { galaxies = []
       , angle = 20
       }
-    , Random.generate NewGalaxies generateGalaxy
+    , Random.generate NewGalaxies generateGalaxies
     )
 
 
 type Msg
-    = NewGalaxies Galaxy
+    = NewGalaxies (List Galaxy)
     | NewAngle
 
 
-starColors distance =
+starColors region =
     Random.map (Maybe.withDefault Color.lightYellow) <|
         Random.Extra.sample <|
-            if distance == 1 then
-                [ Color.lightYellow, Color.lightBlue ]
-            else if distance == 2 then
-                [ Color.red, Color.lightYellow, Color.lightBlue ]
-            else
-                [ Color.red, Color.lightYellow ]
+            case region of
+                Center ->
+                    [ Color.lightYellow, Color.lightBlue ]
+
+                Middle ->
+                    [ Color.red, Color.lightYellow, Color.lightBlue ]
+
+                Outskirts ->
+                    [ Color.red, Color.lightYellow ]
 
 
-randomPoint : Random.Generator Position
-randomPoint =
-    Random.map3 (,,) (float -5 5) (float -5 5) (float -50 50)
+randomPos : StarInfo -> Random.Generator Position
+randomPos { index, curArm, armAngle, position } =
+    let
+        ( x, y, z ) =
+            position
+
+        radius =
+            toFloat index / radiusTuningParam
+
+        angle =
+            toFloat index / (angleTuningParam + (armAngle * (toFloat curArm + 1)))
+
+        newAngle =
+            angle + (5 * toFloat (curArm + 1))
+
+        xPos =
+            (radius * cos newAngle) + x
+
+        yPos =
+            (radius * sin newAngle) + y
+
+        zPos =
+            z
+    in
+    Random.map3 (,,) (float (0 + xPos) (7 + xPos)) (float (0 + yPos) (3 + yPos)) (float (-2 + zPos) (2 + zPos))
 
 
-randomStar : Int -> Random.Generator Star
-randomStar distance =
-    Random.map2 Star (starColors distance) randomPoint
+randomStar : StarInfo -> Random.Generator Star
+randomStar starInfo =
+    Random.map2 Star (starColors starInfo.region) (randomPos starInfo)
 
 
-generateRandomArm distance =
-    list (starsPerArm // 3) (randomStar distance)
+generateGalaxyArm : Position -> Int -> Generator GalaxyArm
+generateGalaxyArm center curArm =
+    let
+        starInfo index region =
+            StarInfo index curArm armAngle center region
 
-
-generateRandomPairs distance =
-    list numArms (generateRandomArm distance)
+        genArm region =
+            List.range 1 (starsPerArm // 3)
+                |> List.map (\index -> randomStar (starInfo (index * 3) region))
+                |> Random.Extra.combine
+    in
+    Random.map3 (+++) (genArm Center) (genArm Middle) (genArm Outskirts)
 
 
 (+++) a b c =
     a ++ b ++ c
 
 
-generateGalaxy =
-    Random.map Galaxy generateGalaxyArms
+generateGalaxy center =
+    List.range 0 numArms
+        |> List.map (generateGalaxyArm center)
+        |> Random.Extra.combine
+        |> Random.map Galaxy
 
 
-generateGalaxyArms : Generator (List GalaxyArm)
-generateGalaxyArms =
-    Random.map3 (+++) (generateRandomPairs 1) (generateRandomPairs 2) (generateRandomPairs 3)
+generateGalaxies =
+    Random.Extra.combine
+        [ generateGalaxy ( 20, -10, -150 )
+
+        -- , generateGalaxy ( -100, -200, 0 )
+        -- , generateGalaxy ( -200, -200, 0 )
+        -- , generateGalaxy ( 200, 200, 0 )
+        -- , generateGalaxy ( 300, 300, 0 )
+        ]
 
 
 update msg model =
     case msg of
-        NewGalaxies newGalaxy ->
-            ( { model | galaxy = newGalaxy }, Cmd.none )
+        NewGalaxies newGalaxies ->
+            ( { model | galaxies = newGalaxies }, Cmd.none )
 
         NewAngle ->
             ( { model | angle = model.angle + 0.005 }, Cmd.none )
@@ -107,8 +162,21 @@ view : Model -> Html msg
 view model =
     scene [ A.vrModeUi True ]
         (viewSky
-            :: viewGalaxy model.angle model.galaxy
+            :: viewBlackHole ( 12, -4, -150 )
+            :: List.map (viewGalaxy model.angle) model.galaxies
         )
+
+
+viewBlackHole ( x, y, z ) =
+    sphere
+        [ Light.type_ Light.Point
+        , A.intensity 2
+        , A.distance 200
+        , A.color Color.white
+        , A.position x y z
+        , A.radius 4
+        ]
+        []
 
 
 subscriptions model =
@@ -135,43 +203,15 @@ angleTuningParam =
     1
 
 
-offsetStarByArmAngle star radius angle =
-    let
-        ( randX, randY, randZ ) =
-            star.position
-
-        x =
-            (radius * cos angle) + randX
-
-        y =
-            (radius * sin angle) + randY
-    in
-    { star | position = ( x, y, randZ ) }
-
-
-getStar curArm index randPair =
-    let
-        radius =
-            toFloat index / radiusTuningParam
-
-        angle =
-            toFloat index / (angleTuningParam + (armAngle * (toFloat curArm + 1)))
-
-        newAngle =
-            angle + (5 * toFloat (curArm + 1))
-    in
-    offsetStarByArmAngle randPair radius newAngle
-
-
-getArm : Int -> List Star -> List Star
-getArm curArm stars =
-    List.indexedMap (getStar curArm) stars
+viewArm stars =
+    List.map viewStar stars
 
 
 viewGalaxy angle galaxy =
-    List.indexedMap getArm galaxy.arms
+    galaxy.arms
         |> List.concat
         |> List.map viewStar
+        |> entity []
 
 
 viewSky =
@@ -189,7 +229,7 @@ viewStar { color, position } =
           --, A.distance 120
           -- , A.color Color.white
           A.radius 0.5
-        , A.position x y (y - 150)
+        , A.position x y (z - 150)
         , Attr.attribute "material" "color: #FFF; shader: flat"
         , A.color color
         ]
