@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import AFrame exposing (..)
+import AFrame.Animations as Anim
 import AFrame.Primitives exposing (box, sky, sphere)
 import AFrame.Primitives.Attributes as A
 import AFrame.Primitives.Light as Light
@@ -8,6 +9,7 @@ import Array
 import Color exposing (Color)
 import Html exposing (..)
 import Html.Attributes as Attr
+import Html.Lazy
 import Random exposing (Generator, float, int, list, map4)
 import Random.Extra exposing (frequency)
 import Time
@@ -64,7 +66,6 @@ init =
 
 type Msg
     = NewGalaxies (List Galaxy)
-    | NewAngle
 
 
 starColors region =
@@ -154,16 +155,13 @@ update msg model =
         NewGalaxies newGalaxies ->
             ( { model | galaxies = newGalaxies }, Cmd.none )
 
-        NewAngle ->
-            ( { model | angle = model.angle + 0.005 }, Cmd.none )
-
 
 view : Model -> Html msg
 view model =
     scene [ A.vrModeUi True ]
         (viewSky
-            :: viewBlackHole ( 12, -4, -150 )
-            :: List.map (viewGalaxy model.angle) model.galaxies
+            -- :: viewBlackHole ( 12, -4, -150 )
+            :: List.map (Html.Lazy.lazy viewGalaxy) model.galaxies
         )
 
 
@@ -188,7 +186,7 @@ numArms =
 
 
 starsPerArm =
-    75
+    50
 
 
 armAngle =
@@ -207,10 +205,23 @@ viewArm stars =
     List.map viewStar stars
 
 
-viewGalaxy angle galaxy =
+animateGalaxy =
+    Anim.animation
+        [ Anim.attribute_ "rotation"
+        , Anim.dur 100000
+        , Anim.fill "forwards"
+        , Anim.to "0 0 360"
+        , Anim.repeat "indefinite"
+        , Anim.easing "linear"
+        ]
+        []
+
+
+viewGalaxy galaxy =
     galaxy.arms
         |> List.concat
         |> List.map viewStar
+        |> (::) animateGalaxy
         |> entity []
 
 
@@ -229,15 +240,11 @@ viewStar { color, position } =
           --, A.distance 120
           -- , A.color Color.white
           A.radius 0.5
-        , A.position x y (z - 150)
+        , A.position x y z
         , Attr.attribute "material" "color: #FFF; shader: flat"
         , A.color color
         ]
         []
-
-
-
---Time.every (100 * Time.millisecond) (\_ -> NewAngle)
 
 
 main =
