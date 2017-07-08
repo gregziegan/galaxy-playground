@@ -47,8 +47,7 @@ type alias Star =
 
 type Region
     = Center
-    | Middle
-    | Outskirts
+    | Arms
 
 
 type alias StarInfo =
@@ -93,13 +92,10 @@ starColors region =
         Random.Extra.sample <|
             case region of
                 Center ->
+                    [ Color.red, Color.darkYellow ]
+
+                Arms ->
                     [ Color.lightYellow, Color.lightBlue ]
-
-                Middle ->
-                    [ Color.red, Color.lightYellow, Color.lightBlue ]
-
-                Outskirts ->
-                    [ Color.red, Color.lightYellow ]
 
 
 randomPos : StarInfo -> Random.Generator Position
@@ -145,11 +141,7 @@ generateGalaxyArm center curArm =
                 |> List.map (\index -> randomStar (starInfo (index * 3) region))
                 |> Random.Extra.combine
     in
-    Random.map3 (+++) (genArm Center) (genArm Middle) (genArm Outskirts)
-
-
-(+++) a b c =
-    a ++ b ++ c
+    Random.map2 (++) (genArm Center) (genArm Arms)
 
 
 viewArm stars =
